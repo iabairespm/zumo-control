@@ -2,195 +2,414 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#111418">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07090f">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Zumo Control</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #111418; --panel: #1b2027; --btn: #262d36; --btn-on: #3b82f6;
-    --text: #e8ecf1; --muted: #8a94a3; --ok: #22c55e; --bad: #ef4444; --stop: #dc2626;
+    --bg: #07090f; --panel: rgba(18, 24, 38, .78); --line: #1e2a44;
+    --cyan: #22e3ff; --mag: #ff2e88; --lime: #9dff3a; --amber: #ffb020;
+    --text: #e6f1ff; --muted: #6f82a6;
+    --glow-c: 0 0 14px rgba(34, 227, 255, .55);
+    --glow-m: 0 0 16px rgba(255, 46, 136, .6);
+    --title: "Orbitron", system-ui, sans-serif;
+    --ui: "Rajdhani", system-ui, sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
-  body { display: flex; flex-direction: column; align-items: center; gap: 14px;
-    padding: 16px; min-height: 100%; }
-  header { width: 100%; max-width: 440px; display: flex; align-items: center; gap: 10px; }
-  h1 { font-size: 1.15rem; margin: 0; flex: 1; letter-spacing: .02em; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); flex: none; }
-  .dot.on { background: var(--ok); }
-  #estado { font-size: .85rem; color: var(--muted); }
-  button { font: inherit; color: var(--text); border: 0; cursor: pointer; }
-  #conectar { width: 100%; max-width: 440px; padding: 14px; border-radius: 12px;
-    background: var(--btn-on); font-weight: 600; font-size: 1rem; }
-  #conectar.on { background: var(--btn); }
-  .pad { width: 100%; max-width: 440px; aspect-ratio: 1; display: grid;
-    grid-template-columns: repeat(3, 1fr); gap: 10px; touch-action: none; }
-  .pad button { background: var(--btn); border-radius: 18px; font-size: 2rem;
-    display: flex; align-items: center; justify-content: center; touch-action: none; }
-  .pad button.diag { font-size: 1.4rem; color: var(--muted); }
-  .pad button.activo { background: var(--btn-on); color: #fff; }
-  .pad button#stop { background: var(--stop); font-size: 1rem; font-weight: 700; }
-  .vel { width: 100%; max-width: 440px; background: var(--panel); border-radius: 14px;
-    padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
-  .vel label { font-size: .9rem; color: var(--muted); }
-  .vel input { flex: 1; accent-color: var(--btn-on); height: 32px; }
-  .vel output { width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  #aviso { max-width: 440px; font-size: .85rem; color: var(--muted); text-align: center; line-height: 1.4; }
-  #aviso.err { color: var(--bad); }
-  .disabled { opacity: .45; pointer-events: none; }
+    font-family: var(--ui); user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none; overflow: hidden; touch-action: none; }
+  body {
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(34,227,255,.16), transparent 60%),
+      radial-gradient(ellipse at 50% 120%, rgba(255,46,136,.14), transparent 55%),
+      linear-gradient(rgba(34,227,255,.05) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(34,227,255,.05) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg);
+  }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; touch-action: none; }
+
+  .app { height: 100%; display: grid; gap: 12px;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
+    grid-template-rows: auto auto 1fr auto; grid-template-areas: "hud" "connect" "drive" "actions";
+    max-width: 520px; margin: 0 auto; }
+
+  /* ---------- HUD ---------- */
+  .hud { grid-area: hud; display: flex; align-items: center; gap: 10px; }
+  .logo { font-family: var(--title); font-weight: 900; font-size: 1.25rem; letter-spacing: .12em;
+    background: linear-gradient(90deg, var(--cyan), var(--mag)); -webkit-background-clip: text;
+    background-clip: text; color: transparent; flex: 1; }
+  .chip { font-family: var(--title); font-size: .62rem; letter-spacing: .14em; padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
+    display: flex; align-items: center; gap: 7px; color: var(--muted); white-space: nowrap; }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--mag); box-shadow: var(--glow-m); }
+  .on .led { background: var(--lime); box-shadow: 0 0 10px var(--lime); }
+  .on #estado { color: var(--lime); }
+  .icon-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); display: grid; place-items: center; color: var(--muted); }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  /* ---------- Conectar ---------- */
+  #conectar { grid-area: connect; height: 54px; border-radius: 14px; font-family: var(--title);
+    font-weight: 700; font-size: .9rem; letter-spacing: .18em; color: #001018;
+    background: linear-gradient(90deg, var(--cyan), #6af0ff); box-shadow: var(--glow-c);
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    animation: pulso 2.2s ease-in-out infinite; }
+  #conectar.on { background: var(--panel); color: var(--muted); box-shadow: none; animation: none;
+    border: 1px solid var(--line); }
+  @keyframes pulso { 50% { filter: brightness(1.18); box-shadow: 0 0 26px rgba(34,227,255,.75); } }
+
+  /* ---------- Zona de manejo ---------- */
+  .drive { grid-area: drive; position: relative; display: grid; place-items: center; min-height: 0; }
+  .modo { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--panel); padding: 3px; z-index: 2; }
+  .modo button { font-family: var(--title); font-size: .6rem; letter-spacing: .14em; padding: 7px 14px;
+    border-radius: 999px; color: var(--muted); }
+  .modo button.sel { background: var(--cyan); color: #001018; box-shadow: var(--glow-c); }
+
+  .stick { --size: min(76vw, 44vh, 330px); width: var(--size); height: var(--size); border-radius: 50%;
+    position: relative; margin-top: 30px;
+    background: radial-gradient(circle, rgba(34,227,255,.08) 0 40%, transparent 41%),
+                radial-gradient(circle, var(--panel) 0 70%, rgba(18,24,38,.4) 71%);
+    border: 2px solid var(--line); box-shadow: inset 0 0 40px rgba(34,227,255,.08); }
+  .stick::before, .stick::after { content: ""; position: absolute; background: var(--line); }
+  .stick::before { left: 50%; top: 8%; bottom: 8%; width: 1px; }
+  .stick::after { top: 50%; left: 8%; right: 8%; height: 1px; }
+  .stick .ring { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid transparent;
+    transition: border-color .15s, box-shadow .15s; }
+  .stick.activo .ring { border-color: var(--cyan); box-shadow: var(--glow-c); }
+  .knob { position: absolute; left: 50%; top: 50%; width: 38%; height: 38%; border-radius: 50%;
+    transform: translate(-50%, -50%); z-index: 1;
+    background: radial-gradient(circle at 35% 30%, #3a4a6e, #121a2c 70%);
+    border: 2px solid var(--cyan); box-shadow: var(--glow-c), inset 0 -6px 14px rgba(0,0,0,.5); }
+  .knob.suelto { transition: transform .18s cubic-bezier(.3,1.6,.5,1); }
+  .dir-tag { position: absolute; font-family: var(--title); font-size: .6rem; color: var(--muted);
+    letter-spacing: .12em; }
+  .t-up { top: 3%; left: 50%; transform: translateX(-50%); }
+  .t-dn { bottom: 3%; left: 50%; transform: translateX(-50%); }
+  .t-lf { left: 4%; top: 50%; transform: translateY(-50%); }
+  .t-rt { right: 4%; top: 50%; transform: translateY(-50%); }
+
+  .pad { --size: min(80vw, 44vh, 340px); width: var(--size); height: var(--size); margin-top: 30px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pad button { border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+    font-size: 1.7rem; color: var(--cyan); display: grid; place-items: center;
+    transition: transform .06s; }
+  .pad button.diag { font-size: 1.15rem; color: var(--muted); }
+  .pad button.centro { border-radius: 50%; color: var(--muted); font-family: var(--title); font-size: .6rem;
+    letter-spacing: .1em; pointer-events: none; }
+  .pad button.activo { background: var(--cyan); color: #001018; box-shadow: var(--glow-c); transform: scale(.95); }
+  [hidden] { display: none !important; }
+
+  /* ---------- Acciones ---------- */
+  .actions { grid-area: actions; display: grid; gap: 10px; grid-template-columns: 1fr auto auto; align-items: stretch; }
+  .gears { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; }
+  .gears .lbl { display: flex; justify-content: space-between; font-family: var(--title);
+    font-size: .58rem; letter-spacing: .14em; color: var(--muted); margin-bottom: 6px; }
+  .gears .lbl b { color: var(--amber); font-weight: 700; }
+  .gear-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .gear-row button { height: 34px; border-radius: 8px; font-family: var(--title); font-weight: 700;
+    font-size: .8rem; background: #0d1322; border: 1px solid var(--line); color: var(--muted); }
+  .gear-row button.sel { background: var(--amber); color: #1a0f00; border-color: var(--amber);
+    box-shadow: 0 0 12px rgba(255,176,32,.55); }
+  .big { width: 82px; border-radius: 16px; font-family: var(--title); font-weight: 900; font-size: .72rem;
+    letter-spacing: .12em; display: grid; place-items: center; gap: 2px; padding: 8px 0; }
+  .big small { font-family: var(--ui); font-size: .7rem; letter-spacing: .05em; font-weight: 500; opacity: .75; }
+  #turbo { border: 2px solid var(--amber); color: var(--amber); background: rgba(255,176,32,.08); }
+  #turbo.activo { background: var(--amber); color: #1a0f00; box-shadow: 0 0 22px rgba(255,176,32,.8); }
+  #stop { border: 2px solid var(--mag); color: #fff; background: linear-gradient(160deg, #ff2e88, #b3105a);
+    box-shadow: var(--glow-m); }
+  #stop:active { transform: scale(.95); }
+
+  /* Medidor de velocidad */
+  .meter { height: 6px; border-radius: 3px; background: #0d1322; overflow: hidden; margin-top: 8px; }
+  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--cyan), var(--amber), var(--mag));
+    transition: width .1s; }
+
+  .msg { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translate(-50%, 140%);
+    max-width: calc(100% - 32px); background: #141c2e; border: 1px solid var(--line); border-left: 3px solid var(--cyan);
+    padding: 10px 14px; border-radius: 10px; font-size: .95rem; transition: transform .25s; z-index: 10; }
+  .msg.show { transform: translate(-50%, 0); }
+  .msg.err { border-left-color: var(--mag); }
+
+  .off .drive, .off .actions { opacity: .35; pointer-events: none; filter: saturate(.4); }
+
+  /* ---------- Horizontal: estilo joystick de consola ---------- */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .app { max-width: none; grid-template-columns: 1fr minmax(220px, 300px) 1fr;
+      grid-template-rows: auto 1fr; grid-template-areas: "hud hud hud" "drive connect actions"; }
+    #conectar { align-self: start; }
+    .stick, .pad { --size: min(72vh, 42vw); margin-top: 0; }
+    .modo { top: auto; bottom: 100%; margin-bottom: -6px; }
+    .actions { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; align-self: center; }
+    .gears { grid-column: 1 / -1; }
+    .big { width: auto; min-height: 90px; }
+  }
 </style>
 </head>
 <body>
-  <header>
-    <span class="dot" id="dot"></span>
-    <h1>Zumo Control</h1>
-    <span id="estado">desconectado</span>
+<div class="app off" id="app">
+  <header class="hud">
+    <div class="logo">ZUMO//CTRL</div>
+    <div class="chip" id="chip"><span class="led"></span><span id="estado">OFFLINE</span></div>
+    <button class="icon-btn" id="fs" aria-label="Pantalla completa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
   </header>
 
-  <button id="conectar">Conectar al robot</button>
+  <button id="conectar">▶ CONECTAR</button>
 
-  <div class="pad disabled" id="pad">
-    <button class="diag" data-cmd="G" aria-label="Adelante izquierda">↖</button>
-    <button data-cmd="F" aria-label="Adelante">▲</button>
-    <button class="diag" data-cmd="I" aria-label="Adelante derecha">↗</button>
-    <button data-cmd="L" aria-label="Girar izquierda">◀</button>
-    <button id="stop" data-cmd="S" aria-label="Stop">STOP</button>
-    <button data-cmd="R" aria-label="Girar derecha">▶</button>
-    <button class="diag" data-cmd="H" aria-label="Atrás izquierda">↙</button>
-    <button data-cmd="B" aria-label="Atrás">▼</button>
-    <button class="diag" data-cmd="J" aria-label="Atrás derecha">↘</button>
-  </div>
+  <section class="drive">
+    <div class="modo" role="tablist">
+      <button id="m-stick" class="sel">STICK</button>
+      <button id="m-pad">D-PAD</button>
+    </div>
 
-  <div class="vel disabled" id="velbox">
-    <label for="vel">Velocidad</label>
-    <input type="range" id="vel" min="1" max="10" value="8">
-    <output id="velout">80%</output>
-  </div>
+    <div class="stick" id="stick">
+      <div class="ring"></div>
+      <span class="dir-tag t-up">FWD</span><span class="dir-tag t-dn">REV</span>
+      <span class="dir-tag t-lf">L</span><span class="dir-tag t-rt">R</span>
+      <div class="knob suelto" id="knob"></div>
+    </div>
 
-  <p id="aviso">Abrí esta página en <b>Chrome para Android</b>, con Bluetooth y Ubicación activados.
-    Mantené apretado un botón para moverte; al soltar, el robot frena.</p>
+    <div class="pad" id="pad" hidden>
+      <button class="diag" data-cmd="G" aria-label="Adelante izquierda">◤</button>
+      <button data-cmd="F" aria-label="Adelante">▲</button>
+      <button class="diag" data-cmd="I" aria-label="Adelante derecha">◥</button>
+      <button data-cmd="L" aria-label="Girar izquierda">◀</button>
+      <button class="centro" tabindex="-1" aria-hidden="true">ZUMO</button>
+      <button data-cmd="R" aria-label="Girar derecha">▶</button>
+      <button class="diag" data-cmd="H" aria-label="Atrás izquierda">◣</button>
+      <button data-cmd="B" aria-label="Atrás">▼</button>
+      <button class="diag" data-cmd="J" aria-label="Atrás derecha">◢</button>
+    </div>
+  </section>
+
+  <section class="actions">
+    <div class="gears">
+      <div class="lbl"><span>MARCHA</span><b id="velout">80%</b></div>
+      <div class="gear-row" id="gears">
+        <button data-g="1">1</button><button data-g="2">2</button><button data-g="3">3</button>
+        <button data-g="4" class="sel">4</button><button data-g="5">5</button>
+      </div>
+      <div class="meter"><i id="meter"></i></div>
+    </div>
+    <button class="big" id="turbo">TURBO<small>mantener</small></button>
+    <button class="big" id="stop">STOP<small>freno</small></button>
+  </section>
+</div>
+<div class="msg" id="msg"></div>
 
 <script>
-// UUIDs habituales de modulos UART BLE (HM-10 / BT05 / AT-09 / JDY, y Nordic UART)
+// ===== Bluetooth BLE (UART HM-10 / BT05 / JDY / Nordic) =====
 const SERVICIOS = [0xffe0, 0xfff0, '6e400001-b5a3-f393-e0a9-e50e24dcca9e'];
-
 const $ = id => document.getElementById(id);
-let device = null, car = null;
-let enviando = false, pendiente = null;
+let device = null, car = null, enviando = false, pendiente = null;
 
-function setEstado(txt, conectado) {
-  $('estado').textContent = txt;
-  $('dot').classList.toggle('on', conectado);
-  $('conectar').classList.toggle('on', conectado);
-  $('conectar').textContent = conectado ? 'Desconectar' : 'Conectar al robot';
-  $('pad').classList.toggle('disabled', !conectado);
-  $('velbox').classList.toggle('disabled', !conectado);
+// Marchas -> digito de velocidad del sketch (0..9, q=100%)
+const MARCHAS = { 1: '3', 2: '5', 3: '6', 4: '8', 5: 'q' };
+const PCT = d => d === 'q' ? 100 : (+d) * 10;
+let marcha = 4, turbo = false, dirActual = 'S', velEnviada = null;
+
+function guardar(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function leer(k) { try { return localStorage.getItem(k); } catch { return null; } }
+
+let msgTimer;
+function aviso(txt, err) {
+  const m = $('msg'); m.textContent = txt; m.classList.toggle('err', !!err); m.classList.add('show');
+  clearTimeout(msgTimer); msgTimer = setTimeout(() => m.classList.remove('show'), 3200);
 }
-function aviso(txt, error) { $('aviso').textContent = txt; $('aviso').classList.toggle('err', !!error); }
+function vibrar(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
 
-// Cola de envio: si llegan comandos mientras se escribe, solo se manda el ultimo.
+function setEstado(txt, on) {
+  $('estado').textContent = txt;
+  $('chip').classList.toggle('on', on);
+  $('app').classList.toggle('off', !on);
+  $('conectar').classList.toggle('on', on);
+  $('conectar').textContent = on ? '■ DESCONECTAR' : '▶ CONECTAR';
+}
+
+// Cola: si llegan varios comandos mientras se escribe, solo va el ultimo (estado completo).
 async function enviar(txt) {
   if (!car) return;
   pendiente = txt;
   if (enviando) return;
   enviando = true;
   while (pendiente !== null) {
-    const datos = new TextEncoder().encode(pendiente);
-    pendiente = null;
+    const datos = new TextEncoder().encode(pendiente); pendiente = null;
     try {
       if (car.properties.writeWithoutResponse) await car.writeValueWithoutResponse(datos);
       else await car.writeValue(datos);
-    } catch (e) { console.warn('Error al enviar', e); }
+    } catch (e) { console.warn(e); }
   }
   enviando = false;
 }
 
+// Manda velocidad + direccion juntas, para que nunca se pierda una.
+function digitoActual(escala = 1) {
+  if (turbo) return 'q';
+  const base = PCT(MARCHAS[marcha]);
+  const p = Math.max(30, Math.round(base * escala / 10) * 10);
+  return p >= 100 ? 'q' : String(p / 10);
+}
+function mandarEstado(dir, escala = 1) {
+  const d = dir === 'S' ? '' : digitoActual(escala);
+  const cambioDir = dir !== dirActual, cambioVel = d && d !== velEnviada;
+  if (!cambioDir && !cambioVel) return;
+  dirActual = dir; if (d) velEnviada = d;
+  enviar(d + dir);
+  $('meter').style.width = dir === 'S' ? '0' : PCT(d) + '%';
+}
+
 async function conectar() {
-  if (!navigator.bluetooth) {
-    aviso('Este navegador no soporta Web Bluetooth. Usá Chrome en Android.', true);
-    return;
-  }
+  if (!navigator.bluetooth) { aviso('Este navegador no soporta Bluetooth. Usá Chrome en Android.', true); return; }
   try {
-    setEstado('buscando…', false);
+    setEstado('SCAN…', false);
     device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICIOS });
     device.addEventListener('gattserverdisconnected', alDesconectar);
-    setEstado('conectando…', false);
+    setEstado('LINK…', false);
     const server = await device.gatt.connect();
     car = null;
     for (const uuid of SERVICIOS) {
-      let srv;
-      try { srv = await server.getPrimaryService(uuid); } catch { continue; }
-      for (const c of await srv.getCharacteristics()) {
+      let srv; try { srv = await server.getPrimaryService(uuid); } catch { continue; }
+      for (const c of await srv.getCharacteristics())
         if (c.properties.write || c.properties.writeWithoutResponse) { car = c; break; }
-      }
       if (car) break;
     }
-    if (!car) {
-      device.gatt.disconnect();
-      throw new Error('El módulo no tiene un servicio UART conocido (FFE0/FFF0/Nordic).');
-    }
-    setEstado(device.name || 'conectado', true);
-    aviso('Conectado. Mantené apretado para mover; soltá para frenar.');
-    enviarVelocidad();
+    if (!car) { device.gatt.disconnect(); throw new Error('El módulo no tiene un servicio UART conocido (FFE0/FFF0/Nordic).'); }
+    setEstado((device.name || 'ONLINE').toUpperCase(), true);
+    dirActual = null; velEnviada = null; mandarEstado('S');
+    vibrar([30, 40, 30]); aviso('Conectado. ¡A pelear!');
+    pedirWakeLock();
   } catch (e) {
-    car = null;
-    setEstado('desconectado', false);
+    car = null; setEstado('OFFLINE', false);
     if (e.name !== 'NotFoundError') aviso('No se pudo conectar: ' + e.message, true);
   }
 }
-
 function alDesconectar() {
-  car = null;
-  limpiarActivos();
-  setEstado('desconectado', false);
-  aviso('Se perdió la conexión. Tocá "Conectar al robot" para reconectar.', true);
+  car = null; soltarTodo(); setEstado('OFFLINE', false);
+  vibrar(200); aviso('Se perdió la conexión. Tocá CONECTAR.', true);
 }
-
 $('conectar').addEventListener('click', () => {
   if (device && device.gatt.connected) { enviar('S'); setTimeout(() => device.gatt.disconnect(), 150); }
   else conectar();
 });
 
-// ---- Pad: apretar = mover, soltar = S ----
-let activo = null;
-function limpiarActivos() { document.querySelectorAll('.pad button').forEach(b => b.classList.remove('activo')); activo = null; }
+// ===== Joystick (8 direcciones, mas lejos = mas rapido) =====
+const stick = $('stick'), knob = $('knob');
+let stickId = null;
+const DIRS = ['R', 'I', 'F', 'G', 'L', 'H', 'B', 'J']; // sectores de 45°, empezando a la derecha, antihorario
 
-document.querySelectorAll('.pad button').forEach(b => {
-  const cmd = b.dataset.cmd;
+function moverStick(e) {
+  const r = stick.getBoundingClientRect();
+  const radio = r.width / 2;
+  let dx = e.clientX - (r.left + radio), dy = e.clientY - (r.top + radio);
+  const dist = Math.hypot(dx, dy), max = radio * 0.62;
+  if (dist > max) { dx *= max / dist; dy *= max / dist; }
+  knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  const mag = Math.min(dist / max, 1);
+  if (mag < 0.25) { mandarEstado('S'); return; }
+  const ang = (Math.atan2(-dy, dx) * 180 / Math.PI + 360 + 22.5) % 360;
+  const dir = DIRS[Math.floor(ang / 45)];
+  if (dir !== dirActual) vibrar(8);
+  mandarEstado(dir, 0.45 + 0.55 * (mag - 0.25) / 0.75);
+}
+stick.addEventListener('pointerdown', e => {
+  e.preventDefault(); stickId = e.pointerId; stick.setPointerCapture(e.pointerId);
+  knob.classList.remove('suelto'); stick.classList.add('activo'); moverStick(e);
+});
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) moverStick(e); });
+function soltarStick(e) {
+  if (e && e.pointerId !== stickId) return;
+  stickId = null; knob.classList.add('suelto'); knob.style.transform = 'translate(-50%, -50%)';
+  stick.classList.remove('activo'); mandarEstado('S');
+}
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => stick.addEventListener(t, soltarStick));
+
+// ===== D-pad =====
+let padActivo = null;
+document.querySelectorAll('.pad button[data-cmd]').forEach(b => {
   b.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    b.setPointerCapture(e.pointerId);
-    limpiarActivos();
-    if (cmd !== 'S') { b.classList.add('activo'); activo = b; }
-    enviar(cmd);
-    if (navigator.vibrate) navigator.vibrate(15);
+    e.preventDefault(); b.setPointerCapture(e.pointerId);
+    if (padActivo) padActivo.classList.remove('activo');
+    padActivo = b; b.classList.add('activo'); vibrar(12); mandarEstado(b.dataset.cmd);
   });
-  const soltar = () => { if (activo === b) { limpiarActivos(); enviar('S'); } };
-  b.addEventListener('pointerup', soltar);
-  b.addEventListener('pointercancel', soltar);
-  b.addEventListener('lostpointercapture', soltar);
-  b.addEventListener('contextmenu', e => e.preventDefault());
+  const soltar = () => { if (padActivo === b) { b.classList.remove('activo'); padActivo = null; mandarEstado('S'); } };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => b.addEventListener(t, soltar));
 });
 
-// ---- Velocidad: 1..9 -> '1'..'9', 10 -> 'q' ----
-function enviarVelocidad() {
-  const v = +$('vel').value;
-  $('velout').textContent = (v * 10) + '%';
-  enviar(v >= 10 ? 'q' : String(v));
+// ===== Modo stick / pad =====
+function setModo(m) {
+  const pad = m === 'pad';
+  $('pad').hidden = !pad; $('stick').hidden = pad;
+  $('m-pad').classList.toggle('sel', pad); $('m-stick').classList.toggle('sel', !pad);
+  soltarTodo(); guardar('zumo-modo', m);
 }
-$('vel').addEventListener('input', enviarVelocidad);
+$('m-stick').addEventListener('click', () => setModo('stick'));
+$('m-pad').addEventListener('click', () => setModo('pad'));
 
-// Modo sin internet
+// ===== Marchas, turbo, stop =====
+function setMarcha(g) {
+  marcha = g;
+  document.querySelectorAll('#gears button').forEach(b => b.classList.toggle('sel', +b.dataset.g === g));
+  $('velout').textContent = PCT(MARCHAS[g]) + '%';
+  guardar('zumo-marcha', g);
+  if (dirActual && dirActual !== 'S') { const d = dirActual; dirActual = null; mandarEstado(d); }
+}
+document.querySelectorAll('#gears button').forEach(b =>
+  b.addEventListener('click', () => { vibrar(10); setMarcha(+b.dataset.g); }));
+
+const tb = $('turbo');
+tb.addEventListener('pointerdown', e => {
+  e.preventDefault(); tb.setPointerCapture(e.pointerId); turbo = true; tb.classList.add('activo'); vibrar([15, 20, 15]);
+  if (dirActual && dirActual !== 'S') { const d = dirActual; dirActual = null; mandarEstado(d); }
+});
+const finTurbo = () => {
+  if (!turbo) return; turbo = false; tb.classList.remove('activo');
+  if (dirActual && dirActual !== 'S') { const d = dirActual; dirActual = null; mandarEstado(d); }
+};
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => tb.addEventListener(t, finTurbo));
+
+function soltarTodo() {
+  if (stickId !== null) soltarStick();
+  if (padActivo) { padActivo.classList.remove('activo'); padActivo = null; }
+  finTurbo(); mandarEstado('S');
+}
+$('stop').addEventListener('pointerdown', e => { e.preventDefault(); vibrar(60); soltarTodo(); enviar('S'); });
+
+// ===== Pantalla completa y pantalla siempre encendida =====
+$('fs').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else { await document.documentElement.requestFullscreen(); try { await screen.orientation.lock('landscape'); } catch {} }
+  } catch {}
+});
+let wakeLock = null;
+async function pedirWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch {} }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) soltarTodo();            // seguridad: si salis de la app, frena
+  else if (car) pedirWakeLock();
+});
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ===== Latido: reenvia el estado cada 150 ms mientras se mueve =====
+// El sketch frena solo si deja de recibir (failsafe), por ejemplo si se corta el Bluetooth.
+setInterval(() => {
+  if (car && dirActual && dirActual !== 'S' && !enviando) enviar((velEnviada || '') + dirActual);
+}, 150);
+
+// ===== Inicio =====
+setMarcha(+(leer('zumo-marcha') || 4));
+setModo(leer('zumo-modo') === 'pad' ? 'pad' : 'stick');
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-
-// Seguridad: si la pagina pasa a segundo plano, frenar.
-document.addEventListener('visibilitychange', () => { if (document.hidden) { limpiarActivos(); enviar('S'); } });
 </script>
 </body>
 </html>

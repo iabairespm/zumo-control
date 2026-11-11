@@ -1,6 +1,6 @@
 // Service worker: guarda la pagina para que funcione sin internet.
 // Al cambiar archivos, subir la version para que se actualice la cache.
-const CACHE = 'zumo-control-v1';
+const CACHE = 'zumo-control-v2';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
