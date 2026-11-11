@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#111418">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Zumo Control</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #111418; --panel: #1b2027; --btn: #262d36; --btn-on: #3b82f6;
+    --text: #e8ecf1; --muted: #8a94a3; --ok: #22c55e; --bad: #ef4444; --stop: #dc2626;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 16px; min-height: 100%; }
+  header { width: 100%; max-width: 440px; display: flex; align-items: center; gap: 10px; }
+  h1 { font-size: 1.15rem; margin: 0; flex: 1; letter-spacing: .02em; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); flex: none; }
+  .dot.on { background: var(--ok); }
+  #estado { font-size: .85rem; color: var(--muted); }
+  button { font: inherit; color: var(--text); border: 0; cursor: pointer; }
+  #conectar { width: 100%; max-width: 440px; padding: 14px; border-radius: 12px;
+    background: var(--btn-on); font-weight: 600; font-size: 1rem; }
+  #conectar.on { background: var(--btn); }
+  .pad { width: 100%; max-width: 440px; aspect-ratio: 1; display: grid;
+    grid-template-columns: repeat(3, 1fr); gap: 10px; touch-action: none; }
+  .pad button { background: var(--btn); border-radius: 18px; font-size: 2rem;
+    display: flex; align-items: center; justify-content: center; touch-action: none; }
+  .pad button.diag { font-size: 1.4rem; color: var(--muted); }
+  .pad button.activo { background: var(--btn-on); color: #fff; }
+  .pad button#stop { background: var(--stop); font-size: 1rem; font-weight: 700; }
+  .vel { width: 100%; max-width: 440px; background: var(--panel); border-radius: 14px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+  .vel label { font-size: .9rem; color: var(--muted); }
+  .vel input { flex: 1; accent-color: var(--btn-on); height: 32px; }
+  .vel output { width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  #aviso { max-width: 440px; font-size: .85rem; color: var(--muted); text-align: center; line-height: 1.4; }
+  #aviso.err { color: var(--bad); }
+  .disabled { opacity: .45; pointer-events: none; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="dot" id="dot"></span>
+    <h1>Zumo Control</h1>
+    <span id="estado">desconectado</span>
+  </header>
+
+  <button id="conectar">Conectar al robot</button>
+
+  <div class="pad disabled" id="pad">
+    <button class="diag" data-cmd="G" aria-label="Adelante izquierda">↖</button>
+    <button data-cmd="F" aria-label="Adelante">▲</button>
+    <button class="diag" data-cmd="I" aria-label="Adelante derecha">↗</button>
+    <button data-cmd="L" aria-label="Girar izquierda">◀</button>
+    <button id="stop" data-cmd="S" aria-label="Stop">STOP</button>
+    <button data-cmd="R" aria-label="Girar derecha">▶</button>
+    <button class="diag" data-cmd="H" aria-label="Atrás izquierda">↙</button>
+    <button data-cmd="B" aria-label="Atrás">▼</button>
+    <button class="diag" data-cmd="J" aria-label="Atrás derecha">↘</button>
+  </div>
+
+  <div class="vel disabled" id="velbox">
+    <label for="vel">Velocidad</label>
+    <input type="range" id="vel" min="1" max="10" value="8">
+    <output id="velout">80%</output>
+  </div>
+
+  <p id="aviso">Abrí esta página en <b>Chrome para Android</b>, con Bluetooth y Ubicación activados.
+    Mantené apretado un botón para moverte; al soltar, el robot frena.</p>
+
+<script>
+// UUIDs habituales de modulos UART BLE (HM-10 / BT05 / AT-09 / JDY, y Nordic UART)
+const SERVICIOS = [0xffe0, 0xfff0, '6e400001-b5a3-f393-e0a9-e50e24dcca9e'];
+
+const $ = id => document.getElementById(id);
+let device = null, car = null;
+let enviando = false, pendiente = null;
+
+function setEstado(txt, conectado) {
+  $('estado').textContent = txt;
+  $('dot').classList.toggle('on', conectado);
+  $('conectar').classList.toggle('on', conectado);
+  $('conectar').textContent = conectado ? 'Desconectar' : 'Conectar al robot';
+  $('pad').classList.toggle('disabled', !conectado);
+  $('velbox').classList.toggle('disabled', !conectado);
+}
+function aviso(txt, error) { $('aviso').textContent = txt; $('aviso').classList.toggle('err', !!error); }
+
+// Cola de envio: si llegan comandos mientras se escribe, solo se manda el ultimo.
+async function enviar(txt) {
+  if (!car) return;
+  pendiente = txt;
+  if (enviando) return;
+  enviando = true;
+  while (pendiente !== null) {
+    const datos = new TextEncoder().encode(pendiente);
+    pendiente = null;
+    try {
+      if (car.properties.writeWithoutResponse) await car.writeValueWithoutResponse(datos);
+      else await car.writeValue(datos);
+    } catch (e) { console.warn('Error al enviar', e); }
+  }
+  enviando = false;
+}
+
+async function conectar() {
+  if (!navigator.bluetooth) {
+    aviso('Este navegador no soporta Web Bluetooth. Usá Chrome en Android.', true);
+    return;
+  }
+  try {
+    setEstado('buscando…', false);
+    device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICIOS });
+    device.addEventListener('gattserverdisconnected', alDesconectar);
+    setEstado('conectando…', false);
+    const server = await device.gatt.connect();
+    car = null;
+    for (const uuid of SERVICIOS) {
+      let srv;
+      try { srv = await server.getPrimaryService(uuid); } catch { continue; }
+      for (const c of await srv.getCharacteristics()) {
+        if (c.properties.write || c.properties.writeWithoutResponse) { car = c; break; }
+      }
+      if (car) break;
+    }
+    if (!car) {
+      device.gatt.disconnect();
+      throw new Error('El módulo no tiene un servicio UART conocido (FFE0/FFF0/Nordic).');
+    }
+    setEstado(device.name || 'conectado', true);
+    aviso('Conectado. Mantené apretado para mover; soltá para frenar.');
+    enviarVelocidad();
+  } catch (e) {
+    car = null;
+    setEstado('desconectado', false);
+    if (e.name !== 'NotFoundError') aviso('No se pudo conectar: ' + e.message, true);
+  }
+}
+
+function alDesconectar() {
+  car = null;
+  limpiarActivos();
+  setEstado('desconectado', false);
+  aviso('Se perdió la conexión. Tocá "Conectar al robot" para reconectar.', true);
+}
+
+$('conectar').addEventListener('click', () => {
+  if (device && device.gatt.connected) { enviar('S'); setTimeout(() => device.gatt.disconnect(), 150); }
+  else conectar();
+});
+
+// ---- Pad: apretar = mover, soltar = S ----
+let activo = null;
+function limpiarActivos() { document.querySelectorAll('.pad button').forEach(b => b.classList.remove('activo')); activo = null; }
+
+document.querySelectorAll('.pad button').forEach(b => {
+  const cmd = b.dataset.cmd;
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    b.setPointerCapture(e.pointerId);
+    limpiarActivos();
+    if (cmd !== 'S') { b.classList.add('activo'); activo = b; }
+    enviar(cmd);
+    if (navigator.vibrate) navigator.vibrate(15);
+  });
+  const soltar = () => { if (activo === b) { limpiarActivos(); enviar('S'); } };
+  b.addEventListener('pointerup', soltar);
+  b.addEventListener('pointercancel', soltar);
+  b.addEventListener('lostpointercapture', soltar);
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+
+// ---- Velocidad: 1..9 -> '1'..'9', 10 -> 'q' ----
+function enviarVelocidad() {
+  const v = +$('vel').value;
+  $('velout').textContent = (v * 10) + '%';
+  enviar(v >= 10 ? 'q' : String(v));
+}
+$('vel').addEventListener('input', enviarVelocidad);
+
+// Modo sin internet
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// Seguridad: si la pagina pasa a segundo plano, frenar.
+document.addEventListener('visibilitychange', () => { if (document.hidden) { limpiarActivos(); enviar('S'); } });
+</script>
+</body>
+</html>
