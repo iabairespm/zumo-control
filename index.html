@@ -43,9 +43,42 @@
 
   /* ---------- HUD ---------- */
   .hud { grid-area: hud; display: flex; align-items: center; gap: 10px; }
-  .logo { font-family: var(--title); font-weight: 900; font-size: 1.25rem; letter-spacing: .12em;
+  .brand { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+  .logo { font-family: var(--title); font-weight: 900; font-size: 1.15rem; letter-spacing: .12em;
     background: linear-gradient(90deg, var(--cyan), var(--mag)); -webkit-background-clip: text;
-    background-clip: text; color: transparent; flex: 1; }
+    background-clip: text; color: transparent; white-space: nowrap; }
+  .tag { font-family: var(--title); font-weight: 700; font-size: .6rem; letter-spacing: .16em;
+    color: var(--amber); padding: 4px 8px; border: 1px solid rgba(255,176,32,.55); border-radius: 6px;
+    text-shadow: 0 0 8px rgba(255,176,32,.8); box-shadow: inset 0 0 10px rgba(255,176,32,.2), 0 0 10px rgba(255,176,32,.2);
+    white-space: nowrap; }
+
+  /* ---------- Fondo: estrella brillante + cielo ---------- */
+  .cosmos { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .app { position: relative; z-index: 1; }
+  .estrella { position: absolute; left: 50%; top: 50%; width: min(120vw, 120vh); aspect-ratio: 1;
+    margin: calc(min(120vw, 120vh) / -2) 0 0 calc(min(120vw, 120vh) / -2);
+    animation: girar 60s linear infinite; will-change: transform; }
+  .estrella svg { width: 100%; height: 100%; display: block; animation: latir 3.4s ease-in-out infinite;
+    will-change: transform, opacity; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  @keyframes latir { 0%, 100% { transform: scale(.9); opacity: .45; } 50% { transform: scale(1.06); opacity: .85; } }
+  .tw { position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #bdf6ff;
+    animation: titilar var(--d) ease-in-out var(--del) infinite; opacity: .15; }
+  @keyframes titilar { 50% { opacity: 1; transform: scale(1.6); } }
+  .fugaz { position: absolute; top: 12%; left: -20%; width: 140px; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, #fff 70%, var(--cyan)); box-shadow: 0 0 10px var(--cyan);
+    transform: rotate(18deg); animation: fugaz 9s ease-in 2s infinite; opacity: 0; }
+  @keyframes fugaz { 0% { transform: translate(0, 0) rotate(18deg); opacity: 0; }
+    3% { opacity: 1; } 12% { transform: translate(140vw, 46vw) rotate(18deg); opacity: 0; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .estrella, .estrella svg, .tw, .fugaz { animation: none; } }
+
+  /* Destello de freno */
+  .flash { position: fixed; inset: 0; z-index: 5; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at 50% 60%, rgba(255,46,136,.45), rgba(255,46,136,.08) 60%, transparent);
+    display: grid; place-items: center; font-family: var(--title); font-weight: 900; font-size: 3rem;
+    letter-spacing: .2em; color: #fff; text-shadow: 0 0 20px var(--mag), 0 0 40px var(--mag); }
+  .flash.on { opacity: 1; }
+  .flash.out { transition: opacity .35s; }
   .chip { font-family: var(--title); font-size: .62rem; letter-spacing: .14em; padding: 6px 10px;
     border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
     display: flex; align-items: center; gap: 7px; color: var(--muted); white-space: nowrap; }
@@ -155,9 +188,29 @@
 </style>
 </head>
 <body>
+<div class="cosmos" id="cosmos" aria-hidden="true">
+  <div class="estrella">
+    <svg viewBox="0 0 200 200">
+      <defs>
+        <radialGradient id="halo"><stop offset="0" stop-color="#22e3ff" stop-opacity=".55"/>
+          <stop offset=".35" stop-color="#ff2e88" stop-opacity=".18"/><stop offset="1" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+        <linearGradient id="brillo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/>
+          <stop offset=".45" stop-color="#22e3ff"/><stop offset="1" stop-color="#ff2e88"/></linearGradient>
+      </defs>
+      <circle cx="100" cy="100" r="100" fill="url(#halo)"/>
+      <path transform="rotate(45 100 100)" opacity=".5" fill="url(#brillo)"
+        d="M100 40 C103 88 112 97 160 100 C112 103 103 112 100 160 C97 112 88 103 40 100 C88 97 97 88 100 40Z"/>
+      <path fill="url(#brillo)"
+        d="M100 8 C105 80 120 95 192 100 C120 105 105 120 100 192 C95 120 80 105 8 100 C80 95 95 80 100 8Z"/>
+      <circle cx="100" cy="100" r="9" fill="#fff"/>
+    </svg>
+  </div>
+  <div class="fugaz"></div>
+</div>
+<div class="flash" id="flash">STOP</div>
 <div class="app off" id="app">
   <header class="hud">
-    <div class="logo">ZUMO//CTRL</div>
+    <div class="brand"><div class="logo">ZUMO//CTRL</div><span class="tag">AXEL - PM</span></div>
     <div class="chip" id="chip"><span class="led"></span><span id="estado">OFFLINE</span></div>
     <button class="icon-btn" id="fs" aria-label="Pantalla completa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
@@ -216,7 +269,7 @@ let device = null, car = null, enviando = false, pendiente = null;
 // Marchas -> digito de velocidad del sketch (0..9, q=100%)
 const MARCHAS = { 1: '3', 2: '5', 3: '6', 4: '8', 5: 'q' };
 const PCT = d => d === 'q' ? 100 : (+d) * 10;
-let marcha = 4, turbo = false, dirActual = 'S', velEnviada = null;
+let marcha = 4, turbo = false, dirActual = 'S', velEnviada = null, stopApretado = false;
 
 function guardar(k, v) { try { localStorage.setItem(k, v); } catch {} }
 function leer(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -260,6 +313,7 @@ function digitoActual(escala = 1) {
   return p >= 100 ? 'q' : String(p / 10);
 }
 function mandarEstado(dir, escala = 1) {
+  if (stopApretado && dir !== 'S') return;   // freno de emergencia: ignora todo movimiento
   const d = dir === 'S' ? '' : digitoActual(escala);
   const cambioDir = dir !== dirActual, cambioVel = d && d !== velEnviada;
   if (!cambioDir && !cambioVel) return;
@@ -382,7 +436,37 @@ function soltarTodo() {
   if (padActivo) { padActivo.classList.remove('activo'); padActivo = null; }
   finTurbo(); mandarEstado('S');
 }
-$('stop').addEventListener('pointerdown', e => { e.preventDefault(); vibrar(60); soltarTodo(); enviar('S'); });
+// STOP = freno de emergencia: frena al instante y, mientras se mantiene apretado,
+// bloquea joystick/pad/turbo. Para volver a moverse hay que tocar de nuevo el control.
+const btnStop = $('stop'), flash = $('flash');
+btnStop.addEventListener('pointerdown', e => {
+  e.preventDefault(); btnStop.setPointerCapture(e.pointerId);
+  stopApretado = true;
+  soltarTodo();                    // suelta joystick, pad y turbo (el dedo que siga apoyado queda ignorado)
+  dirActual = 'S'; enviar('S');
+  setTimeout(() => enviar('S'), 60); // segundo envio por las dudas
+  vibrar(90);
+  flash.classList.remove('out'); flash.classList.add('on');
+});
+const finStop = () => {
+  if (!stopApretado) return;
+  stopApretado = false;
+  flash.classList.add('out'); flash.classList.remove('on');
+};
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => btnStop.addEventListener(t, finStop));
+
+// ===== Cielo con estrellas que titilan =====
+(() => {
+  const cielo = $('cosmos');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('i');
+    const t = Math.random() * 2.2 + 1;
+    s.className = 'tw';
+    s.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;width:${t}px;height:${t}px;` +
+      `--d:${(Math.random() * 3 + 2).toFixed(1)}s;--del:${(Math.random() * 4).toFixed(1)}s`;
+    cielo.appendChild(s);
+  }
+})();
 
 // ===== Pantalla completa y pantalla siempre encendida =====
 $('fs').addEventListener('click', async () => {
