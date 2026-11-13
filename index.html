@@ -362,18 +362,8 @@ async function conectar() {
     setEstado('SCAN…', false);
     device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICIOS });
     device.addEventListener('gattserverdisconnected', alDesconectar);
-    setEstado('LINK…', false);
-    const server = await device.gatt.connect();
-    car = null;
-    for (const uuid of SERVICIOS) {
-      let srv; try { srv = await server.getPrimaryService(uuid); } catch { continue; }
-      for (const c of await srv.getCharacteristics())
-        if (c.properties.write || c.properties.writeWithoutResponse) { car = c; break; }
-      if (car) break;
-    }
-    if (!car) { device.gatt.disconnect(); throw new Error('El módulo no tiene un servicio UART conocido (FFE0/FFF0/Nordic).'); }
-    setEstado((device.name || 'ONLINE').toUpperCase(), true);
-    dirActual = null; velEnviada = null; mandarEstado('S');
+    desconexionManual = false;
+    await enlazar();
     vibrar([30, 40, 30]); aviso('Conectado. ¡A pelear!');
     pedirWakeLock();
   } catch (e) {
@@ -381,12 +371,37 @@ async function conectar() {
     if (e.name !== 'NotFoundError') aviso('No se pudo conectar: ' + e.message, true);
   }
 }
-function alDesconectar() {
+// Conecta al GATT del dispositivo ya elegido y busca la caracteristica UART.
+async function enlazar() {
+  setEstado('LINK…', false);
+  const server = await device.gatt.connect();
+  car = null;
+  for (const uuid of SERVICIOS) {
+    let srv; try { srv = await server.getPrimaryService(uuid); } catch { continue; }
+    for (const c of await srv.getCharacteristics())
+      if (c.properties.write || c.properties.writeWithoutResponse) { car = c; break; }
+    if (car) break;
+  }
+  if (!car) { device.gatt.disconnect(); throw new Error('El módulo no tiene un servicio UART conocido (FFE0/FFF0/Nordic).'); }
+  enviando = false; pendiente = null;
+  setEstado((device.name || 'ONLINE').toUpperCase(), true);
+  dirActual = null; velEnviada = null; mandarEstado('S');
+}
+let desconexionManual = false, reconectando = false;
+async function alDesconectar() {
   car = null; soltarTodo(); setEstado('OFFLINE', false);
-  vibrar(200); aviso('Se perdió la conexión. Tocá CONECTAR.', true);
+  if (desconexionManual || reconectando) return;
+  // Reconexion automatica: hasta 5 intentos sin tener que volver a elegir el dispositivo.
+  reconectando = true; vibrar(200); aviso('Se cortó. Reconectando…', true);
+  for (let i = 0; i < 5 && !desconexionManual; i++) {
+    try { await enlazar(); reconectando = false; vibrar([30, 40, 30]); aviso('Reconectado.'); return; }
+    catch (e) { console.warn('reconexion', e); await new Promise(r => setTimeout(r, 800)); }
+  }
+  reconectando = false; setEstado('OFFLINE', false);
+  aviso('Se perdió la conexión. Tocá CONECTAR.', true);
 }
 $('conectar').addEventListener('click', () => {
-  if (device && device.gatt.connected) { enviar('S'); setTimeout(() => device.gatt.disconnect(), 150); }
+  if (device && device.gatt.connected) { desconexionManual = true; enviar('S'); setTimeout(() => device.gatt.disconnect(), 150); }
   else conectar();
 });
 
@@ -523,6 +538,11 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 setInterval(() => {
   if (car && dirActual && dirActual !== 'S' && !enviando) enviar((velEnviada || '') + dirActual);
 }, 150);
+// Keep-alive: quieto no se mandaba nada y el modulo/Android cortaba la conexion a los ~30 s.
+// Cada 2 s manda 'S' (el sketch lo ignora si ya esta frenado).
+setInterval(() => {
+  if (car && (!dirActual || dirActual === 'S') && !enviando) enviar('S');
+}, 2000);
 
 // ===== Modo claro / oscuro =====
 function aplicarTema(t) {
